@@ -1,11 +1,16 @@
-const CACHE_NAME = "beibei-food-pwa-v1";
+const CACHE_NAME = "beibei-food-pwa-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./assets/icon.svg"
+  "./assets/icon.svg",
+  "./assets/icon-home-cook.png",
+  "./assets/icon-outside.png",
+  "./assets/icon-fast-food.png",
+  "./assets/icon-fruit.png",
+  "./assets/icon-drink.png"
 ];
 
 self.addEventListener("install", event => {

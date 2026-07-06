@@ -38,12 +38,17 @@ const app = {
   category: "homeCook",
   search: "",
   planSearch: "",
-  planStatus: "全部"
+  planStatus: "全部",
+  manageMode: false
 };
 
 const view = document.querySelector("#view");
 const modal = document.querySelector("#modal");
 const toastEl = document.querySelector("#toast");
+const LONG_PRESS_MS = 800;
+let categoryPressTimer = 0;
+let categoryPressStart = null;
+let ignoreNextCategoryClick = false;
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -174,50 +179,53 @@ function renderKitchen() {
     .sort((a, b) => Math.abs(dateDistance(a.eatDate)) - Math.abs(dateDistance(b.eatDate)));
 
   view.innerHTML = `
-    <section class="page">
-      <header class="topbar">
-        ${settings.avatar ? `<img class="avatar" src="${settings.avatar}" alt="头像" data-action="edit-shop">` : `<button class="avatar" data-action="edit-shop">贝</button>`}
-        <div class="title-wrap">
-          <h1 class="title">${esc(settings.shopName)}</h1>
-          <p class="subtitle">菜品、照片和评价都只存在这台手机里</p>
+    <section class="page kitchen-page">
+      <header class="top-header">
+        ${settings.avatar ? `<img class="logo-avatar" src="${settings.avatar}" alt="头像" data-action="edit-shop">` : `<button class="logo-avatar" data-action="edit-shop">👧</button>`}
+        <h1 class="title">${esc(settings.shopName)}</h1>
+        <div class="search-box">
+          <input class="search-input" data-field="kitchen-search" placeholder="搜索菜品" value="${esc(app.search)}">
         </div>
+        ${app.manageMode ? `<button class="manage-tip" data-action="exit-manage">退出</button>` : ""}
       </header>
-      <div class="toolbar">
-        <input class="search" data-field="kitchen-search" placeholder="搜索菜品名称、描述或做法" value="${esc(app.search)}">
-        <button class="primary-btn" data-action="open-food-form">添加</button>
+      <div class="container">
+        <aside class="left-category">
+          ${CATEGORIES.map(cat => `<button class="category-item ${cat.key === app.category ? "active" : ""}" data-action="switch-category" data-category="${cat.key}"><span class="category-icon">${categoryIcon(cat.key)}</span><span>${cat.name}</span></button>`).join("")}
+        </aside>
+        <div class="right-food-list">
+          ${filtered.map(foodCard).join("") || `<div class="empty-tip">${app.search ? "未找到匹配的菜品" : "该分类暂无菜品，点击底部中间加号添加菜品"}</div>`}
+        </div>
       </div>
-      <div class="category-row">
-        ${CATEGORIES.map(cat => `<button class="chip ${cat.key === app.category ? "active" : ""}" data-action="switch-category" data-category="${cat.key}">${cat.name}</button>`).join("")}
-      </div>
-      <div class="grid food-grid">
-        ${filtered.map(foodCard).join("") || `<div class="empty">这个分类还没有菜品，先添加一道吧。</div>`}
-      </div>
+      <button class="mid-add-btn" data-action="open-food-form" aria-label="添加菜品"><span class="plus">+</span></button>
     </section>
   `;
 }
 
 function foodCard(food) {
-  const remark = food.remark ? `<span class="tag ${food.remark.tone || "pink"}">${esc(food.remark.text)}</span>` : "";
+  const remark = food.remark ? `<div class="food-remark-tag">${esc(food.remark.text)}</div>` : "";
   return `
-    <article class="card food-card">
+    <article class="card food-card" data-action="food-detail" data-id="${food.id}">
+      ${remark}
+      ${app.manageMode ? `<button class="del-food-btn" data-action="delete-food" data-id="${food.id}">删除</button>` : ""}
       ${imageHtml(food.image, "菜品图")}
-      <div class="card-main">
-        <div class="card-head">
-          <div>
-            <div class="name">${esc(food.name)}</div>
-            <div class="meta">${esc(food.desc || getCategoryName(food.category))}</div>
-          </div>
-          <div class="price">¥${money(food.price)}</div>
-        </div>
-        <div class="small">就餐日期：${esc(food.eatDate || "未填写")}</div>
-        <div>${remark}</div>
-        <div class="actions">
-          <button class="secondary-btn" data-action="food-detail" data-id="${food.id}">详情</button>
-          <button class="primary-btn" data-action="add-cart" data-id="${food.id}">加入菜单</button>
-        </div>
+      <div class="food-info">
+        <div class="food-name">${esc(food.name)}</div>
+        <div class="food-alias">${esc(food.desc || getCategoryName(food.category))}</div>
+        <div class="food-price">¥${money(food.price)}</div>
       </div>
+      ${app.manageMode ? "" : `<button class="add-circle" data-action="add-cart" data-id="${food.id}" aria-label="加入菜单">+</button>`}
     </article>
   `;
+}
+
+function categoryIcon(key) {
+  return {
+    homeCook: '<img src="assets/icon-home-cook.png" alt="">',
+    outside: '<img src="assets/icon-outside.png" alt="">',
+    fastFood: '<img src="assets/icon-fast-food.png" alt="">',
+    fruit: '<img src="assets/icon-fruit.png" alt="">',
+    drink: '<img src="assets/icon-drink.png" alt="">'
+  }[key] || "";
 }
 
 function renderOrder() {
@@ -227,12 +235,9 @@ function renderOrder() {
   const total = items.reduce((sum, item) => sum + Number(item.food.price || 0) * item.count, 0);
 
   view.innerHTML = `
-    <section class="page">
-      <header class="topbar">
-        <div class="title-wrap">
-          <h1 class="title">本次菜单</h1>
-          <p class="subtitle">从厨房里点进来的菜，会在这里合并数量</p>
-        </div>
+    <section class="page page-wrap">
+      <header class="page-head">
+        <h1 class="page-title">本次菜单</h1>
       </header>
       <div class="summary-panel">
         <div class="summary-line"><span>菜品数量</span><strong>${items.reduce((sum, item) => sum + item.count, 0)}</strong></div>
@@ -240,7 +245,7 @@ function renderOrder() {
         ${items.length ? `<button class="danger-btn" data-action="clear-cart">清空菜单</button>` : ""}
       </div>
       <div class="grid">
-        ${items.map(orderCard).join("") || `<div class="empty">菜单还是空的，去厨房里给想吃的菜点“加入菜单”。</div>`}
+        ${items.map(orderCard).join("") || `<div class="empty-tip">菜单为空，去厨房点击加号加购菜品</div>`}
       </div>
     </section>
   `;
@@ -251,16 +256,12 @@ function orderCard(item) {
   return `
     <article class="card order-card">
       ${imageHtml(food.image, "菜品图")}
-      <div class="card-main">
-        <div class="card-head">
-          <div>
-            <div class="name">${esc(food.name)}</div>
-            <div class="meta">${esc(getCategoryName(food.category))}</div>
-          </div>
-          <div class="price">¥${money(Number(food.price || 0) * item.count)}</div>
-        </div>
-        <div class="small">单价 ¥${money(food.price)}</div>
-        <div class="actions">
+      <div class="food-info order-info">
+        <div class="food-name">${esc(food.name)}</div>
+        <div class="food-alias">${esc(getCategoryName(food.category))}</div>
+        <div class="food-price">单价 ¥${money(food.price)}</div>
+        <div class="subtotal">小计 ¥${money(Number(food.price || 0) * item.count)}</div>
+        <div class="actions order-actions">
           <div class="count-control" aria-label="数量">
             <button data-action="sub-cart" data-id="${food.id}">-</button>
             <span>${item.count}</span>
@@ -288,55 +289,56 @@ function renderPlan() {
     .slice(0, 3);
 
   view.innerHTML = `
-    <section class="page">
-      <header class="topbar">
-        <div class="title-wrap">
-          <h1 class="title">想吃计划</h1>
-          <p class="subtitle">记录餐厅、链接、理由和安排日期</p>
-        </div>
+    <section class="page plan-page">
+      <header class="page-head">
+        <h1 class="page-title">想吃计划</h1>
       </header>
-      <div class="toolbar">
+      <div class="plan-toolbar">
         <input class="search" data-field="plan-search" placeholder="搜索餐厅、地点、推荐菜" value="${esc(app.planSearch)}">
-        <button class="primary-btn" data-action="open-plan-form">添加</button>
       </div>
       <div class="chip-row">
         ${statuses.map(status => `<button class="chip ${status === app.planStatus ? "active" : ""}" data-action="filter-plan" data-status="${status}">${status}</button>`).join("")}
       </div>
-      ${reminders.length ? `<div class="summary-panel">${reminders.map(reminderLine).join("")}</div>` : ""}
+      ${reminders.length ? `<div class="reminder-panel">${reminders.map(reminderLine).join("")}</div>` : ""}
       <div class="grid plan-grid">
-        ${list.map(planCard).join("") || `<div class="empty">还没有想吃计划，看到心动的店就记下来。</div>`}
+        ${list.map(planCard).join("") || `<div class="empty-tip">暂无计划菜单，记录一个想吃的地方吧</div>`}
       </div>
+      <button class="plan-add-btn" data-action="open-plan-form" aria-label="添加计划">+</button>
     </section>
   `;
 }
 
 function reminderLine(plan) {
   return `
-    <button class="summary-line secondary-btn" data-action="plan-detail" data-id="${plan.id}">
-      <span>${esc(reminderText(plan.planDate))}：${esc(plan.restaurantName)}</span>
-      <span>${esc(plan.location || "未填地点")}</span>
+    <button class="reminder-item" data-action="plan-detail" data-id="${plan.id}">
+      <span class="reminder-date">${esc(reminderText(plan.planDate))}</span>
+      <span class="reminder-name">${esc(plan.restaurantName)}</span>
+      <span class="reminder-location">${esc(plan.location || "未填地点")}</span>
     </button>
   `;
 }
 
 function planCard(plan) {
   return `
-    <article class="card plan-card">
+    <article class="card plan-card" data-action="plan-detail" data-id="${plan.id}">
       ${imageHtml(plan.image, "计划图")}
-      <div class="card-main">
-        <div class="card-head">
-          <div>
-            <div class="name">${esc(plan.restaurantName)}</div>
-            <div class="meta">${esc(plan.location || "未填地点")}</div>
+      <div class="plan-card-main">
+        <div class="plan-card-head">
+          <div class="plan-title-wrap">
+            <div class="plan-name">${esc(plan.restaurantName)}</div>
+            <div class="plan-location">${esc(plan.location || "未填写地点")}</div>
           </div>
-          <span class="tag ${priorityTone(plan.priority)}">${esc(plan.priority || "想去")}</span>
+          <span class="priority-tag ${priorityTone(plan.priority)}">${esc(plan.priority || "想去")}</span>
         </div>
-        <div class="small">${esc(plan.platform || "其他")} · ${esc(plan.status || "想去")} · ${esc(plan.planDate || "待定")}</div>
-        ${plan.recommendedDishes ? `<div class="small">推荐菜：${esc(plan.recommendedDishes)}</div>` : ""}
-        <div class="actions">
-          <button class="secondary-btn" data-action="plan-detail" data-id="${plan.id}">详情</button>
-          <button class="secondary-btn" data-action="open-plan-form" data-id="${plan.id}">编辑</button>
-          <button class="danger-btn" data-action="delete-plan" data-id="${plan.id}">删除</button>
+        <div class="plan-meta">
+          <span>${esc(plan.platform || "其他平台")}</span>
+          <span>${esc(plan.status || "想去")}</span>
+          <span>${esc(plan.planDate || "待定")}</span>
+        </div>
+        ${plan.recommendedDishes ? `<div class="dish-line"><span class="label">推荐菜</span><span class="value">${esc(plan.recommendedDishes)}</span></div>` : ""}
+        <div class="card-actions">
+          <button class="plan-action-btn plan-secondary-btn" data-action="open-plan-form" data-id="${plan.id}">编辑</button>
+          <button class="plan-action-btn plan-danger-btn" data-action="delete-plan" data-id="${plan.id}">删除</button>
         </div>
       </div>
     </article>
@@ -346,12 +348,9 @@ function planCard(plan) {
 function renderBackup() {
   const size = new Blob([JSON.stringify(app.state)]).size;
   view.innerHTML = `
-    <section class="page">
-      <header class="topbar">
-        <div class="title-wrap">
-          <h1 class="title">本地备份</h1>
-          <p class="subtitle">所有数据在本机，建议偶尔导出一份 JSON 备份</p>
-        </div>
+    <section class="page page-wrap">
+      <header class="page-head">
+        <h1 class="page-title">本地备份</h1>
       </header>
       <div class="backup-box">
         <div class="summary-line"><span>菜品</span><strong>${app.state.foods.length}</strong></div>
@@ -421,7 +420,7 @@ function sheet(title, body) {
     <section class="sheet" role="dialog" aria-modal="true">
       <header class="sheet-head">
         <h2 class="sheet-title">${esc(title)}</h2>
-        <button class="icon-btn" data-action="close-modal" aria-label="关闭">×</button>
+        <button class="icon-btn" data-action="close-modal" aria-label="关闭">关闭</button>
       </header>
       <div class="sheet-body">${body}</div>
     </section>
@@ -666,14 +665,25 @@ async function handleClick(event) {
   const foodId = target.dataset.id;
 
   if (action === "close-modal") closeModal();
+  if (action === "exit-manage") {
+    app.manageMode = false;
+    render();
+    return;
+  }
   if (action === "switch-category") {
+    if (ignoreNextCategoryClick) {
+      ignoreNextCategoryClick = false;
+      return;
+    }
+    if (app.manageMode) return;
     app.category = target.dataset.category;
     app.search = "";
     render();
   }
   if (action === "open-food-form") openFoodForm(foodId);
-  if (action === "food-detail") openFoodDetail(foodId);
+  if (action === "food-detail" && !app.manageMode) openFoodDetail(foodId);
   if (action === "add-cart") {
+    if (app.manageMode) return;
     addCart(foodId);
     await saveState();
     render();
@@ -702,6 +712,7 @@ async function handleClick(event) {
     await saveState();
     closeModal();
     render();
+    toast("删除成功");
   }
   if (action === "set-remark") {
     const remark = REMARKS.find(item => item.text === target.dataset.remark);
@@ -732,6 +743,45 @@ async function handleClick(event) {
     app.state = defaultState();
     await saveState();
     render();
+  }
+}
+
+function handlePointerDown(event) {
+  const target = event.target.closest("[data-action='switch-category']");
+  if (!target || app.tab !== "kitchen") return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  window.clearTimeout(categoryPressTimer);
+  categoryPressStart = {
+    x: event.clientX,
+    y: event.clientY,
+    category: target.dataset.category
+  };
+  categoryPressTimer = window.setTimeout(() => {
+    app.category = categoryPressStart.category;
+    app.search = "";
+    app.manageMode = !app.manageMode;
+    ignoreNextCategoryClick = true;
+    render();
+    toast(app.manageMode ? "已进入管理模式" : "已退出管理模式");
+  }, LONG_PRESS_MS);
+}
+
+function handlePointerMove(event) {
+  if (!categoryPressStart) return;
+  const moveX = Math.abs(event.clientX - categoryPressStart.x);
+  const moveY = Math.abs(event.clientY - categoryPressStart.y);
+  if (moveX > 10 || moveY > 10) clearCategoryPress();
+}
+
+function clearCategoryPress() {
+  window.clearTimeout(categoryPressTimer);
+  categoryPressTimer = 0;
+  categoryPressStart = null;
+}
+
+function handleContextMenu(event) {
+  if (event.target.closest("[data-action='switch-category']")) {
+    event.preventDefault();
   }
 }
 
@@ -811,12 +861,18 @@ function openShopForm() {
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     app.tab = btn.dataset.tab;
+    app.manageMode = false;
     closeModal();
     render();
   });
 });
 
 document.addEventListener("click", handleClick);
+document.addEventListener("pointerdown", handlePointerDown);
+document.addEventListener("pointermove", handlePointerMove);
+document.addEventListener("pointerup", clearCategoryPress);
+document.addEventListener("pointercancel", clearCategoryPress);
+document.addEventListener("contextmenu", handleContextMenu);
 document.addEventListener("input", handleInput);
 document.addEventListener("change", handleChange);
 modal.addEventListener("click", event => {
