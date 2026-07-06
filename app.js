@@ -114,6 +114,73 @@ function normalizeState(value) {
   };
 }
 
+function normalizeMiniProgramExport(value) {
+  const data = value && typeof value === "object" ? value : {};
+  const foods = Array.isArray(data.foods) ? data.foods : Array.isArray(data.foodLib) ? data.foodLib : [];
+  const plans = Array.isArray(data.plans) ? data.plans : Array.isArray(data.planMenu) ? data.planMenu : [];
+  return {
+    foods: foods.map(normalizeImportedFood).filter(item => item.name),
+    plans: plans.map(normalizeImportedPlan).filter(item => item.restaurantName)
+  };
+}
+
+function normalizeImportedFood(item) {
+  const rawId = String(item.mpId || item._id || item.id || id());
+  const itemId = String(item.id || `mp-food-${rawId}`);
+  return {
+    id: itemId.startsWith("mp-food-") ? itemId : `mp-food-${itemId}`,
+    mpId: rawId,
+    name: String(item.name || "").trim(),
+    desc: String(item.desc || "").trim(),
+    price: Number(item.price || 0),
+    recipe: String(item.recipe || "").trim(),
+    image: getImportedImage(item),
+    imageFileID: item.imageFileID || item.img || "",
+    category: CATEGORIES.some(cat => cat.key === item.category) ? item.category : "homeCook",
+    eatDate: String(item.eatDate || "").trim(),
+    remark: item.remark && !item.remark.cancelled ? item.remark : null,
+    createdAt: String(item.createdAt || item.createTime || item._createTime || new Date().toISOString())
+  };
+}
+
+function normalizeImportedPlan(item) {
+  const rawId = String(item.mpId || item._id || item.id || id());
+  const itemId = String(item.id || `mp-plan-${rawId}`);
+  return {
+    id: itemId.startsWith("mp-plan-") ? itemId : `mp-plan-${itemId}`,
+    mpId: rawId,
+    restaurantName: String(item.restaurantName || item.name || "").trim(),
+    location: String(item.location || "").trim(),
+    avgPrice: String(item.avgPrice || "").trim(),
+    recommendedDishes: String(item.recommendedDishes || "").trim(),
+    platform: String(item.platform || "其他"),
+    sourceLink: String(item.sourceLink || "").trim(),
+    image: getImportedImage(item),
+    imageFileID: item.imageFileID || item.img || "",
+    reason: String(item.reason || "").trim(),
+    planDate: String(item.planDate || "").trim(),
+    status: String(item.status || "想去"),
+    priority: String(item.priority || "想去"),
+    notes: String(item.notes || "").trim(),
+    createdAt: String(item.createdAt || item.createTime || item._createTime || new Date().toISOString())
+  };
+}
+
+function getImportedImage(item) {
+  const image = String(item.image || item.imgDataUrl || "");
+  if (image.startsWith("data:image/")) return image;
+  return "";
+}
+
+function mergeById(current, incoming) {
+  const map = new Map(current.map(item => [item.id, item]));
+  incoming.forEach(item => {
+    const old = map.get(item.id);
+    map.set(item.id, old ? { ...old, ...item, image: item.image || old.image } : item);
+  });
+  return Array.from(map.values());
+}
+
 function id() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -361,8 +428,15 @@ function renderBackup() {
       <div class="backup-box">
         <button class="primary-btn" data-action="export-data">导出备份文件</button>
         <label>
-          <span class="label">导入备份文件</span>
+          <span class="label">导入网页备份文件（覆盖当前数据）</span>
           <input class="field" type="file" accept="application/json,.json" data-field="import-data">
+        </label>
+      </div>
+      <div class="backup-box import-box">
+        <label class="import-label">
+          <span class="label">一键导入小程序导出文件</span>
+          <span class="import-hint">会合并菜品和计划，不会清空当前网页数据；同一条小程序记录会自动更新。</span>
+          <input class="field" type="file" accept="application/json,.json" data-field="import-miniprogram">
         </label>
       </div>
       <div class="backup-box">
@@ -799,20 +873,43 @@ function handleInput(event) {
 
 async function handleChange(event) {
   const field = event.target.dataset.field;
-  if (field !== "import-data") return;
+  if (field !== "import-data" && field !== "import-miniprogram") return;
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
   try {
-    const imported = normalizeState(JSON.parse(text));
-    if (!confirm("导入会覆盖当前本地数据，确定继续吗？")) return;
-    app.state = imported;
-    await saveState();
-    render();
-    toast("备份已导入");
+    const parsed = JSON.parse(text);
+    if (field === "import-miniprogram") {
+      await importMiniProgramExport(parsed);
+    } else {
+      const imported = normalizeState(parsed);
+      if (!confirm("导入会覆盖当前本地数据，确定继续吗？")) return;
+      app.state = imported;
+      await saveState();
+      render();
+      toast("备份已导入");
+    }
   } catch (error) {
-    toast("备份文件读取失败");
+    console.error("导入文件失败", error);
+    toast("导入文件读取失败");
+  } finally {
+    event.target.value = "";
   }
+}
+
+async function importMiniProgramExport(parsed) {
+  const imported = normalizeMiniProgramExport(parsed);
+  if (imported.foods.length === 0 && imported.plans.length === 0) {
+    toast("没有识别到小程序菜品或计划");
+    return;
+  }
+  const message = `将合并导入 ${imported.foods.length} 个菜品、${imported.plans.length} 个计划，不会清空当前网页数据。继续吗？`;
+  if (!confirm(message)) return;
+  app.state.foods = mergeById(app.state.foods, imported.foods);
+  app.state.plans = mergeById(app.state.plans, imported.plans);
+  await saveState();
+  render();
+  toast("小程序数据已导入");
 }
 
 function exportData() {
