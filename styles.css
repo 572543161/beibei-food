@@ -899,6 +899,12 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+.import-textarea {
+  min-height: 150px;
+  resize: vertical;
+  word-break: break-all;
+}
+
 .toast {
   position: fixed;
   z-index: 80;
