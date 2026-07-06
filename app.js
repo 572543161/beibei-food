@@ -39,7 +39,6 @@ const app = {
   search: "",
   planSearch: "",
   planStatus: "全部",
-  importText: "",
   manageMode: false
 };
 
@@ -115,21 +114,22 @@ function normalizeState(value) {
   };
 }
 
-function normalizeMiniProgramExport(value) {
+function normalizeBackupImport(value) {
   const data = value && typeof value === "object" ? value : {};
-  const foods = Array.isArray(data.foods) ? data.foods : Array.isArray(data.foodLib) ? data.foodLib : [];
-  const plans = Array.isArray(data.plans) ? data.plans : Array.isArray(data.planMenu) ? data.planMenu : [];
+  const source = data.data && typeof data.data === "object" ? data.data : data;
+  const foods = Array.isArray(source.foods) ? source.foods : Array.isArray(source.foodLib) ? source.foodLib : [];
+  const plans = Array.isArray(source.plans) ? source.plans : Array.isArray(source.planMenu) ? source.planMenu : [];
   return {
-    foods: foods.map(normalizeImportedFood).filter(item => item.name),
-    plans: plans.map(normalizeImportedPlan).filter(item => item.restaurantName)
+    foods: foods.map(normalizeImportedFood).filter(isValidFood),
+    plans: plans.map(normalizeImportedPlan).filter(isValidPlan)
   };
 }
 
 function normalizeImportedFood(item) {
   const rawId = String(item.mpId || item._id || item.id || id());
-  const itemId = String(item.id || `mp-food-${rawId}`);
+  const category = CATEGORIES.some(cat => cat.key === item.category) ? item.category : "homeCook";
   return {
-    id: itemId.startsWith("mp-food-") ? itemId : `mp-food-${itemId}`,
+    id: item.id ? String(item.id) : `mp-food-${rawId}`,
     mpId: rawId,
     name: String(item.name || "").trim(),
     desc: String(item.desc || "").trim(),
@@ -137,7 +137,7 @@ function normalizeImportedFood(item) {
     recipe: String(item.recipe || "").trim(),
     image: getImportedImage(item),
     imageFileID: item.imageFileID || item.img || "",
-    category: CATEGORIES.some(cat => cat.key === item.category) ? item.category : "homeCook",
+    category,
     eatDate: String(item.eatDate || "").trim(),
     remark: item.remark && !item.remark.cancelled ? item.remark : null,
     createdAt: String(item.createdAt || item.createTime || item._createTime || new Date().toISOString())
@@ -146,9 +146,8 @@ function normalizeImportedFood(item) {
 
 function normalizeImportedPlan(item) {
   const rawId = String(item.mpId || item._id || item.id || id());
-  const itemId = String(item.id || `mp-plan-${rawId}`);
   return {
-    id: itemId.startsWith("mp-plan-") ? itemId : `mp-plan-${itemId}`,
+    id: item.id ? String(item.id) : `mp-plan-${rawId}`,
     mpId: rawId,
     restaurantName: String(item.restaurantName || item.name || "").trim(),
     location: String(item.location || "").trim(),
@@ -173,13 +172,73 @@ function getImportedImage(item) {
   return "";
 }
 
-function mergeById(current, incoming) {
-  const map = new Map(current.map(item => [item.id, item]));
-  incoming.forEach(item => {
-    const old = map.get(item.id);
-    map.set(item.id, old ? { ...old, ...item, image: item.image || old.image } : item);
+function isValidFood(food) {
+  return Boolean(food.name && CATEGORIES.some(cat => cat.key === food.category) && Number.isFinite(Number(food.price)));
+}
+
+function isValidPlan(plan) {
+  return Boolean(plan.restaurantName);
+}
+
+function mergeImportCollection(current, incoming, getKeys) {
+  const result = current.map(item => ({ ...item }));
+  const keyMap = new Map();
+  result.forEach((item, index) => {
+    getKeys(item).forEach(key => keyMap.set(key, index));
   });
-  return Array.from(map.values());
+  const stats = { added: 0, skipped: 0, enriched: 0 };
+
+  incoming.forEach(item => {
+    const duplicateIndex = getKeys(item).map(key => keyMap.get(key)).find(index => index !== undefined);
+    if (duplicateIndex === undefined) {
+      const nextIndex = result.push(item) - 1;
+      getKeys(item).forEach(key => keyMap.set(key, nextIndex));
+      stats.added += 1;
+      return;
+    }
+
+    const merged = fillMissingFields(result[duplicateIndex], item);
+    if (merged.changed) {
+      result[duplicateIndex] = merged.item;
+      getKeys(merged.item).forEach(key => keyMap.set(key, duplicateIndex));
+      stats.enriched += 1;
+    } else {
+      stats.skipped += 1;
+    }
+  });
+
+  return { items: result, stats };
+}
+
+function fillMissingFields(current, incoming) {
+  let changed = false;
+  const next = { ...current };
+  Object.entries(incoming).forEach(([key, value]) => {
+    if (key === "id" || key === "createdAt") return;
+    const hasCurrentValue = next[key] !== undefined && next[key] !== null && next[key] !== "";
+    const hasIncomingValue = value !== undefined && value !== null && value !== "";
+    if (!hasCurrentValue && hasIncomingValue) {
+      next[key] = value;
+      changed = true;
+    }
+  });
+  return { item: next, changed };
+}
+
+function foodImportKeys(food) {
+  return [
+    food.id && `id:${food.id}`,
+    food.mpId && `mp:${food.mpId}`,
+    food.name && `name:${food.name.trim().toLowerCase()}|${food.category}|${food.eatDate || ""}`
+  ].filter(Boolean);
+}
+
+function planImportKeys(plan) {
+  return [
+    plan.id && `id:${plan.id}`,
+    plan.mpId && `mp:${plan.mpId}`,
+    plan.restaurantName && `name:${plan.restaurantName.trim().toLowerCase()}|${(plan.location || "").trim().toLowerCase()}|${plan.planDate || ""}`
+  ].filter(Boolean);
 }
 
 function id() {
@@ -414,7 +473,8 @@ function planCard(plan) {
 }
 
 function renderBackup() {
-  const size = new Blob([JSON.stringify(app.state)]).size;
+  const backupData = createBackupPayload();
+  const size = new Blob([JSON.stringify(backupData)]).size;
   view.innerHTML = `
     <section class="page page-wrap">
       <header class="page-head">
@@ -426,23 +486,15 @@ function renderBackup() {
         <div class="summary-line"><span>想吃计划</span><strong>${app.state.plans.length}</strong></div>
         <div class="summary-line"><span>本地数据大小</span><strong>${Math.ceil(size / 1024)} KB</strong></div>
       </div>
-      <div class="backup-box import-box">
-        <label class="import-label">
-          <span class="label">小程序导出内容</span>
-          <span class="import-hint">小程序点导出后会复制一段内容，粘贴到这里即可导入。</span>
-          <textarea class="textarea import-textarea" placeholder="粘贴小程序导出内容" data-field="import-miniprogram-text">${esc(app.importText)}</textarea>
-        </label>
-        <button class="secondary-btn" data-action="import-miniprogram-text">从粘贴内容导入</button>
-      </div>
       <div class="backup-box">
-        <button class="primary-btn" data-action="export-data">导出网页备份文件</button>
+        <button class="primary-btn" data-action="export-data">导出全部菜品和计划</button>
         <label>
-          <span class="label">导入网页备份文件（覆盖当前数据）</span>
+          <span class="label">一键导入备份文件</span>
+          <span class="import-hint">备份包含菜品、计划和图片；导入前会校验内容，已存在的菜品和计划不会重复导入。</span>
           <input class="field" type="file" accept="application/json,.json" data-field="import-data">
         </label>
       </div>
       <div class="backup-box">
-        <button class="secondary-btn" data-action="edit-shop">修改店铺名称和头像</button>
         <button class="danger-btn" data-action="wipe-data">清空本地数据</button>
       </div>
     </section>
@@ -594,6 +646,39 @@ function openFoodDetail(foodId) {
     </div>
   `;
   openModal(sheet("菜品详情", body));
+}
+
+function openDeleteFoodConfirm(foodId) {
+  const food = app.state.foods.find(item => item.id === foodId);
+  if (!food) return;
+  const cartItem = app.state.cart.find(item => item.foodId === foodId);
+  const cartText = cartItem ? `它也会从当前菜单中移除（当前 ${cartItem.count} 份）。` : "当前菜单里没有这道菜。";
+  const body = `
+    <div class="delete-confirm">
+      ${food.image ? `<img class="delete-preview" src="${food.image}" alt="${esc(food.name)}">` : ""}
+      <div>
+        <div class="name">${esc(food.name)}</div>
+        <p class="small">${esc(getCategoryName(food.category))} · ${esc(food.eatDate || "未填写日期")}</p>
+      </div>
+      <p class="import-hint">删除后会从本机菜品库移除，${cartText} 建议先在备份页导出一份最新备份。</p>
+      <div class="actions">
+        <button class="secondary-btn" data-action="close-modal">取消</button>
+        <button class="danger-btn" data-action="confirm-delete-food" data-id="${food.id}">确认删除</button>
+      </div>
+    </div>
+  `;
+  openModal(sheet("删除菜品", body));
+}
+
+async function deleteFood(foodId) {
+  const food = app.state.foods.find(item => item.id === foodId);
+  if (!food) return;
+  app.state.foods = app.state.foods.filter(item => item.id !== foodId);
+  app.state.cart = app.state.cart.filter(item => item.foodId !== foodId);
+  await saveState();
+  closeModal();
+  render();
+  toast(`已删除「${food.name}」`);
 }
 
 function openPlanForm(planId = "") {
@@ -782,13 +867,13 @@ async function handleClick(event) {
     await saveState();
     render();
   }
-  if (action === "delete-food" && confirm("确定删除这个菜品吗？")) {
-    app.state.foods = app.state.foods.filter(food => food.id !== foodId);
-    app.state.cart = app.state.cart.filter(item => item.foodId !== foodId);
-    await saveState();
-    closeModal();
-    render();
-    toast("删除成功");
+  if (action === "delete-food") {
+    openDeleteFoodConfirm(foodId);
+    return;
+  }
+  if (action === "confirm-delete-food") {
+    await deleteFood(foodId);
+    return;
   }
   if (action === "set-remark") {
     const remark = REMARKS.find(item => item.text === target.dataset.remark);
@@ -814,7 +899,6 @@ async function handleClick(event) {
     render();
   }
   if (action === "export-data") exportData();
-  if (action === "import-miniprogram-text") importMiniProgramFromText();
   if (action === "edit-shop") openShopForm();
   if (action === "wipe-data" && confirm("这会删除本机所有菜品、菜单和计划，确定继续吗？")) {
     app.state = defaultState();
@@ -872,9 +956,6 @@ function handleInput(event) {
     app.planSearch = event.target.value.trim();
     renderPlan();
   }
-  if (field === "import-miniprogram-text") {
-    app.importText = event.target.value.trim();
-  }
 }
 
 async function handleChange(event) {
@@ -885,65 +966,36 @@ async function handleChange(event) {
   const text = await file.text();
   try {
     const parsed = JSON.parse(text);
-    const imported = normalizeState(parsed);
-    if (!confirm("导入会覆盖当前本地数据，确定继续吗？")) return;
-    app.state = imported;
-    await saveState();
-    render();
-    toast("备份已导入");
+    await importBackupData(parsed);
   } catch (error) {
     console.error("导入文件失败", error);
-    toast("导入文件读取失败");
+    toast("导入文件校验失败");
   } finally {
     event.target.value = "";
   }
 }
 
-async function importMiniProgramFromText() {
-  const input = document.querySelector('[data-field="import-miniprogram-text"]');
-  const text = String((input && input.value) || app.importText || "").trim();
-  if (!text) {
-    toast("请先粘贴小程序导出内容");
-    return;
-  }
-  try {
-    const parsed = parseMiniProgramImportText(text);
-    app.importText = text;
-    await importMiniProgramExport(parsed);
-  } catch (error) {
-    console.error("粘贴内容导入失败", error);
-    toast("粘贴内容读取失败，请确认复制的是小程序导出内容");
-  }
-}
-
-function parseMiniProgramImportText(text) {
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start < 0 || end <= start) throw error;
-    return JSON.parse(text.slice(start, end + 1));
-  }
-}
-
-async function importMiniProgramExport(parsed) {
-  const imported = normalizeMiniProgramExport(parsed);
+async function importBackupData(parsed) {
+  const imported = normalizeBackupImport(parsed);
   if (imported.foods.length === 0 && imported.plans.length === 0) {
-    toast("没有识别到小程序菜品或计划");
+    toast("没有识别到可导入的菜品或计划");
     return;
   }
-  const message = `将合并导入 ${imported.foods.length} 个菜品、${imported.plans.length} 个计划，不会清空当前网页数据。继续吗？`;
+  const foodMerge = mergeImportCollection(app.state.foods, imported.foods, foodImportKeys);
+  const planMerge = mergeImportCollection(app.state.plans, imported.plans, planImportKeys);
+  const totalNew = foodMerge.stats.added + planMerge.stats.added;
+  const totalExisting = foodMerge.stats.skipped + foodMerge.stats.enriched + planMerge.stats.skipped + planMerge.stats.enriched;
+  const message = `识别到 ${imported.foods.length} 个菜品、${imported.plans.length} 个计划。\n将新增 ${totalNew} 条，已存在 ${totalExisting} 条不会重复导入。\n继续导入吗？`;
   if (!confirm(message)) return;
-  app.state.foods = mergeById(app.state.foods, imported.foods);
-  app.state.plans = mergeById(app.state.plans, imported.plans);
+  app.state.foods = foodMerge.items;
+  app.state.plans = planMerge.items;
   await saveState();
   render();
-  toast("小程序数据已导入");
+  toast(`导入完成：新增 ${totalNew} 条`);
 }
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(app.state, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(createBackupPayload(), null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -952,6 +1004,19 @@ function exportData() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function createBackupPayload() {
+  return {
+    app: "beibei-food-store",
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    data: {
+      settings: app.state.settings,
+      foods: app.state.foods,
+      plans: app.state.plans
+    }
+  };
 }
 
 function openShopForm() {

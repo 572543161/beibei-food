@@ -861,6 +861,19 @@ select:focus-visible {
   gap: 12px;
 }
 
+.delete-confirm {
+  display: grid;
+  gap: 12px;
+}
+
+.delete-preview {
+  width: 100%;
+  max-height: 180px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: var(--page-bg);
+}
+
 .detail-section {
   padding: 12px 0;
   border-top: 1px solid #eee;
