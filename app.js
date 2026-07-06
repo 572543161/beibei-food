@@ -1,6 +1,7 @@
 const DB_NAME = "beibei-food-store";
 const DB_VERSION = 1;
 const STORE_NAME = "kv";
+const DEFAULT_AVATAR = "assets/default-avatar.jpg";
 
 const CATEGORIES = [
   { key: "homeCook", name: "家里做的" },
@@ -25,7 +26,7 @@ const defaultState = () => ({
   version: 1,
   settings: {
     shopName: "贝贝的小食铺",
-    avatar: ""
+    avatar: DEFAULT_AVATAR
   },
   foods: [],
   cart: [],
@@ -39,6 +40,7 @@ const app = {
   search: "",
   planSearch: "",
   planStatus: "全部",
+  importText: "",
   manageMode: false
 };
 
@@ -104,10 +106,12 @@ async function saveState() {
 
 function normalizeState(value) {
   const fresh = defaultState();
+  const settings = { ...fresh.settings, ...(value.settings || {}) };
+  settings.avatar = settings.avatar || DEFAULT_AVATAR;
   return {
     ...fresh,
     ...value,
-    settings: { ...fresh.settings, ...(value.settings || {}) },
+    settings,
     foods: Array.isArray(value.foods) ? value.foods : [],
     cart: Array.isArray(value.cart) ? value.cart : [],
     plans: Array.isArray(value.plans) ? value.plans : []
@@ -493,6 +497,14 @@ function renderBackup() {
           <span class="import-hint">备份包含菜品、计划和图片；导入前会校验内容，已存在的菜品和计划不会重复导入。</span>
           <input class="field" type="file" accept="application/json,.json" data-field="import-data">
         </label>
+      </div>
+      <div class="backup-box import-box">
+        <label class="import-label">
+          <span class="label">粘贴导入内容</span>
+          <span class="import-hint">把导入内容.txt 里的全部文字粘贴到这里，可恢复菜品和计划；已存在的不会重复导入。</span>
+          <textarea class="textarea import-textarea" placeholder="粘贴导入内容.txt 里的全部内容" data-field="import-text">${esc(app.importText)}</textarea>
+        </label>
+        <button class="secondary-btn" data-action="import-text">从粘贴内容导入</button>
       </div>
       <div class="backup-box">
         <button class="danger-btn" data-action="wipe-data">清空本地数据</button>
@@ -899,6 +911,7 @@ async function handleClick(event) {
     render();
   }
   if (action === "export-data") exportData();
+  if (action === "import-text") importBackupText();
   if (action === "edit-shop") openShopForm();
   if (action === "wipe-data" && confirm("这会删除本机所有菜品、菜单和计划，确定继续吗？")) {
     app.state = defaultState();
@@ -956,6 +969,9 @@ function handleInput(event) {
     app.planSearch = event.target.value.trim();
     renderPlan();
   }
+  if (field === "import-text") {
+    app.importText = event.target.value.trim();
+  }
 }
 
 async function handleChange(event) {
@@ -972,6 +988,33 @@ async function handleChange(event) {
     toast("导入文件校验失败");
   } finally {
     event.target.value = "";
+  }
+}
+
+async function importBackupText() {
+  const input = document.querySelector('[data-field="import-text"]');
+  const text = String((input && input.value) || app.importText || "").trim();
+  if (!text) {
+    toast("请先粘贴导入内容");
+    return;
+  }
+  try {
+    app.importText = text;
+    await importBackupData(parseImportText(text));
+  } catch (error) {
+    console.error("粘贴内容导入失败", error);
+    toast("粘贴内容读取失败，请确认复制了完整内容");
+  }
+}
+
+function parseImportText(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) throw error;
+    return JSON.parse(text.slice(start, end + 1));
   }
 }
 

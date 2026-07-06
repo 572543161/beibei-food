@@ -1,4 +1,4 @@
-const CACHE_NAME = "beibei-food-pwa-v8";
+const CACHE_NAME = "beibei-food-pwa-v9";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const ASSETS = [
   "./app.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",
+  "./assets/default-avatar.jpg",
   "./assets/icon-home-cook.png",
   "./assets/icon-outside.png",
   "./assets/icon-fast-food.png",
