@@ -1,0 +1,19 @@
+{
+  "name": "贝贝的小食铺",
+  "short_name": "小食铺",
+  "description": "一个只保存在自己手机里的离线菜单和想吃计划。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff8fa",
+  "theme_color": "#fff4f7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
