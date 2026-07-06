@@ -39,7 +39,6 @@ const app = {
   search: "",
   planSearch: "",
   planStatus: "全部",
-  importUrl: "",
   importText: "",
   manageMode: false
 };
@@ -427,31 +426,20 @@ function renderBackup() {
         <div class="summary-line"><span>想吃计划</span><strong>${app.state.plans.length}</strong></div>
         <div class="summary-line"><span>本地数据大小</span><strong>${Math.ceil(size / 1024)} KB</strong></div>
       </div>
-      <div class="backup-box">
-        <button class="primary-btn" data-action="export-data">导出备份文件</button>
-        <label>
-          <span class="label">导入网页备份文件（覆盖当前数据）</span>
-          <input class="field" type="file" accept="application/json,.json" data-field="import-data">
-        </label>
-      </div>
       <div class="backup-box import-box">
         <label class="import-label">
-          <span class="label">一键导入小程序导出文件</span>
-          <span class="import-hint">会合并菜品和计划，不会清空当前网页数据；同一条小程序记录会自动更新。</span>
-          <input class="field" type="file" accept="application/json,.json" data-field="import-miniprogram">
-        </label>
-        <label class="import-label">
-          <span class="label">粘贴小程序导出链接导入</span>
-          <span class="import-hint">小程序复制导出链接后，粘贴到这里直接导入。</span>
-          <input class="field" type="url" inputmode="url" placeholder="粘贴小程序导出链接" data-field="import-miniprogram-url" value="${esc(app.importUrl)}">
-        </label>
-        <button class="secondary-btn" data-action="import-miniprogram-url">从链接导入</button>
-        <label class="import-label">
-          <span class="label">粘贴小程序导出内容导入</span>
+          <span class="label">小程序导出内容</span>
           <span class="import-hint">小程序点导出后会复制一段内容，粘贴到这里即可导入。</span>
           <textarea class="textarea import-textarea" placeholder="粘贴小程序导出内容" data-field="import-miniprogram-text">${esc(app.importText)}</textarea>
         </label>
         <button class="secondary-btn" data-action="import-miniprogram-text">从粘贴内容导入</button>
+      </div>
+      <div class="backup-box">
+        <button class="primary-btn" data-action="export-data">导出网页备份文件</button>
+        <label>
+          <span class="label">导入网页备份文件（覆盖当前数据）</span>
+          <input class="field" type="file" accept="application/json,.json" data-field="import-data">
+        </label>
       </div>
       <div class="backup-box">
         <button class="secondary-btn" data-action="edit-shop">修改店铺名称和头像</button>
@@ -826,7 +814,6 @@ async function handleClick(event) {
     render();
   }
   if (action === "export-data") exportData();
-  if (action === "import-miniprogram-url") importMiniProgramFromUrl();
   if (action === "import-miniprogram-text") importMiniProgramFromText();
   if (action === "edit-shop") openShopForm();
   if (action === "wipe-data" && confirm("这会删除本机所有菜品、菜单和计划，确定继续吗？")) {
@@ -885,9 +872,6 @@ function handleInput(event) {
     app.planSearch = event.target.value.trim();
     renderPlan();
   }
-  if (field === "import-miniprogram-url") {
-    app.importUrl = event.target.value.trim();
-  }
   if (field === "import-miniprogram-text") {
     app.importText = event.target.value.trim();
   }
@@ -895,48 +879,23 @@ function handleInput(event) {
 
 async function handleChange(event) {
   const field = event.target.dataset.field;
-  if (field !== "import-data" && field !== "import-miniprogram") return;
+  if (field !== "import-data") return;
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
   try {
     const parsed = JSON.parse(text);
-    if (field === "import-miniprogram") {
-      await importMiniProgramExport(parsed);
-    } else {
-      const imported = normalizeState(parsed);
-      if (!confirm("导入会覆盖当前本地数据，确定继续吗？")) return;
-      app.state = imported;
-      await saveState();
-      render();
-      toast("备份已导入");
-    }
+    const imported = normalizeState(parsed);
+    if (!confirm("导入会覆盖当前本地数据，确定继续吗？")) return;
+    app.state = imported;
+    await saveState();
+    render();
+    toast("备份已导入");
   } catch (error) {
     console.error("导入文件失败", error);
     toast("导入文件读取失败");
   } finally {
     event.target.value = "";
-  }
-}
-
-async function importMiniProgramFromUrl() {
-  const input = document.querySelector('[data-field="import-miniprogram-url"]');
-  const url = String((input && input.value) || app.importUrl || "").trim();
-  if (!url) {
-    toast("请先粘贴小程序导出链接");
-    return;
-  }
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`链接读取失败：${response.status}`);
-    }
-    const parsed = await response.json();
-    app.importUrl = url;
-    await importMiniProgramExport(parsed);
-  } catch (error) {
-    console.error("链接导入失败", error);
-    toast("链接读取失败，请打开链接下载文件后再导入");
   }
 }
 
