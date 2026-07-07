@@ -679,7 +679,16 @@ function remarkOptionsHtml(food) {
   if (food.remark) {
     return remarkCardHtml(food.id, food.remark, true);
   }
-  return REMARKS.map(remark => remarkCardHtml(food.id, remark, false)).join("");
+  return `
+    <button class="remark-add-btn" data-action="show-remark-options" data-id="${food.id}">
+      <span class="remark-add-icon">+</span>
+      <span>添加评价</span>
+    </button>
+  `;
+}
+
+function allRemarkCardsHtml(foodId) {
+  return REMARKS.map(remark => remarkCardHtml(foodId, remark, false)).join("");
 }
 
 function remarkCardHtml(foodId, remark, active = false) {
@@ -959,6 +968,11 @@ async function handleClick(event) {
   }
   if (action === "confirm-delete-food") {
     await deleteFood(foodId);
+    return;
+  }
+  if (action === "show-remark-options") {
+    const picker = target.closest(".remark-picker");
+    if (picker) picker.innerHTML = allRemarkCardsHtml(foodId);
     return;
   }
   if (action === "set-remark") {
