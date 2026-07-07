@@ -306,6 +306,7 @@ function renderKitchen() {
         <h1 class="title">${esc(settings.shopName)}</h1>
         <div class="search-box">
           <input class="search-input" data-field="kitchen-search" placeholder="搜索菜品" value="${esc(app.search)}">
+          <button class="search-refresh-btn" data-action="global-refresh" aria-label="刷新最新版本" title="刷新最新版本">↻</button>
         </div>
       </header>
       <div class="container">
@@ -890,6 +891,27 @@ function addCart(foodId) {
   else app.state.cart.push({ foodId, count: 1 });
 }
 
+async function globalRefresh() {
+  toast("正在刷新最新版本...");
+  try {
+    const tasks = [];
+    if ("serviceWorker" in navigator) {
+      tasks.push(
+        navigator.serviceWorker.getRegistrations()
+          .then(registrations => Promise.all(registrations.map(registration => registration.update().catch(() => {}))))
+      );
+    }
+    if ("caches" in window) {
+      tasks.push(caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))));
+    }
+    await Promise.all(tasks);
+  } catch (error) {
+    console.warn("刷新缓存失败，继续重新加载", error);
+  } finally {
+    window.setTimeout(() => window.location.reload(), 260);
+  }
+}
+
 async function handleClick(event) {
   const target = event.target.closest("[data-action]");
   if (!target) return;
@@ -897,6 +919,10 @@ async function handleClick(event) {
   const foodId = target.dataset.id;
 
   if (action === "close-modal") closeModal();
+  if (action === "global-refresh") {
+    await globalRefresh();
+    return;
+  }
   if (action === "switch-category") {
     app.category = target.dataset.category;
     app.search = "";
