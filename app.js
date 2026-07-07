@@ -353,7 +353,12 @@ function renderKitchen() {
     <section class="page kitchen-page">
       <header class="top-header">
         ${settings.avatar ? `<img class="logo-avatar" src="${settings.avatar}" alt="头像" data-action="open-backup">` : `<button class="logo-avatar" data-action="open-backup">👧</button>`}
-        <h1 class="title">${esc(settings.shopName)}</h1>
+        <h1 class="title" aria-label="${esc(settings.shopName)}">
+          <span class="title-marquee">
+            <span>${esc(settings.shopName)}</span>
+            <span aria-hidden="true">${esc(settings.shopName)}</span>
+          </span>
+        </h1>
         <div class="search-box">
           <input class="search-input" data-field="kitchen-search" placeholder="搜索菜品" value="${esc(app.search)}">
           <button class="search-refresh-btn" data-action="global-refresh" aria-label="刷新最新版本" title="刷新最新版本">↻</button>
