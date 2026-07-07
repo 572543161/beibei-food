@@ -303,11 +303,7 @@ function render() {
 }
 
 function renderKitchen() {
-  const { settings, foods } = app.state;
-  const filtered = foods
-    .filter(food => food.category === app.category)
-    .filter(food => !app.search || [food.name, food.desc, food.recipe].some(text => String(text || "").toLowerCase().includes(app.search.toLowerCase())))
-    .sort((a, b) => Math.abs(dateDistance(a.eatDate)) - Math.abs(dateDistance(b.eatDate)));
+  const { settings } = app.state;
 
   view.innerHTML = `
     <section class="page kitchen-page">
@@ -324,12 +320,29 @@ function renderKitchen() {
           ${CATEGORIES.map(cat => `<button class="category-item ${cat.key === app.category ? "active" : ""}" data-action="switch-category" data-category="${cat.key}"><span class="category-icon">${categoryIcon(cat.key)}</span><span>${cat.name}</span></button>`).join("")}
         </aside>
         <div class="right-food-list">
-          ${filtered.map(foodCard).join("") || `<div class="empty-tip">${app.search ? "未找到匹配的菜品" : "该分类暂无菜品，点击底部中间加号添加菜品"}</div>`}
+          ${kitchenFoodListHtml()}
         </div>
       </div>
       <button class="mid-add-btn" data-action="open-food-form" aria-label="添加菜品"><span class="plus">+</span></button>
     </section>
   `;
+}
+
+function filteredKitchenFoods() {
+  return app.state.foods
+    .filter(food => food.category === app.category)
+    .filter(food => !app.search || [food.name, food.desc, food.recipe].some(text => String(text || "").toLowerCase().includes(app.search.toLowerCase())))
+    .sort((a, b) => Math.abs(dateDistance(a.eatDate)) - Math.abs(dateDistance(b.eatDate)));
+}
+
+function kitchenFoodListHtml() {
+  const filtered = filteredKitchenFoods();
+  return filtered.map(foodCard).join("") || `<div class="empty-tip">${app.search ? "未找到匹配的菜品" : "该分类暂无菜品，点击底部中间加号添加菜品"}</div>`;
+}
+
+function refreshKitchenFoodList() {
+  const list = document.querySelector(".right-food-list");
+  if (list) list.innerHTML = kitchenFoodListHtml();
 }
 
 function foodCard(food) {
@@ -407,10 +420,6 @@ function orderCard(item) {
 
 function renderPlan() {
   const statuses = ["全部", ...PLAN_STATUS];
-  const list = app.state.plans
-    .filter(plan => app.planStatus === "全部" || plan.status === app.planStatus)
-    .filter(plan => !app.planSearch || [plan.restaurantName, plan.location, plan.recommendedDishes, plan.reason, plan.notes].some(text => String(text || "").toLowerCase().includes(app.planSearch.toLowerCase())))
-    .sort(comparePlan);
   const reminders = app.state.plans
     .filter(plan => {
       const distance = dateDistance(plan.planDate);
@@ -432,11 +441,28 @@ function renderPlan() {
       </div>
       ${reminders.length ? `<div class="reminder-panel">${reminders.map(reminderLine).join("")}</div>` : ""}
       <div class="grid plan-grid">
-        ${list.map(planCard).join("") || `<div class="empty-tip">暂无计划菜单，记录一个想吃的地方吧</div>`}
+        ${planListHtml()}
       </div>
       <button class="plan-add-btn" data-action="open-plan-form" aria-label="添加计划">+</button>
     </section>
   `;
+}
+
+function filteredPlans() {
+  return app.state.plans
+    .filter(plan => app.planStatus === "全部" || plan.status === app.planStatus)
+    .filter(plan => !app.planSearch || [plan.restaurantName, plan.location, plan.recommendedDishes, plan.reason, plan.notes].some(text => String(text || "").toLowerCase().includes(app.planSearch.toLowerCase())))
+    .sort(comparePlan);
+}
+
+function planListHtml() {
+  const list = filteredPlans();
+  return list.map(planCard).join("") || `<div class="empty-tip">暂无计划菜单，记录一个想吃的地方吧</div>`;
+}
+
+function refreshPlanList() {
+  const list = document.querySelector(".plan-grid");
+  if (list) list.innerHTML = planListHtml();
 }
 
 function reminderLine(plan) {
@@ -492,10 +518,11 @@ function renderBackup() {
       </div>
       <div class="backup-box">
         <button class="primary-btn" data-action="export-data">导出全部菜品和计划</button>
-        <label>
+        <label class="file-import-label">
           <span class="label">一键导入备份文件</span>
           <span class="import-hint">备份包含菜品、计划和图片；导入前会校验内容，已存在的菜品和计划不会重复导入。</span>
-          <input class="field" type="file" accept="application/json,.json" data-field="import-data">
+          <span class="file-pick-btn">选择备份文件</span>
+          <input class="file-input" type="file" accept="application/json,.json,.txt,text/plain" data-field="import-data">
         </label>
       </div>
       <div class="backup-box import-box">
@@ -505,9 +532,6 @@ function renderBackup() {
           <textarea class="textarea import-textarea" placeholder="粘贴导入内容.txt 里的全部内容" data-field="import-text">${esc(app.importText)}</textarea>
         </label>
         <button class="secondary-btn" data-action="import-text">从粘贴内容导入</button>
-      </div>
-      <div class="backup-box">
-        <button class="danger-btn" data-action="wipe-data">清空本地数据</button>
       </div>
     </section>
   `;
@@ -913,11 +937,6 @@ async function handleClick(event) {
   if (action === "export-data") exportData();
   if (action === "import-text") importBackupText();
   if (action === "edit-shop") openShopForm();
-  if (action === "wipe-data" && confirm("这会删除本机所有菜品、菜单和计划，确定继续吗？")) {
-    app.state = defaultState();
-    await saveState();
-    render();
-  }
 }
 
 function handlePointerDown(event) {
@@ -963,11 +982,11 @@ function handleInput(event) {
   const field = event.target.dataset.field;
   if (field === "kitchen-search") {
     app.search = event.target.value.trim();
-    renderKitchen();
+    refreshKitchenFoodList();
   }
   if (field === "plan-search") {
     app.planSearch = event.target.value.trim();
-    renderPlan();
+    refreshPlanList();
   }
   if (field === "import-text") {
     app.importText = event.target.value.trim();
@@ -981,8 +1000,7 @@ async function handleChange(event) {
   if (!file) return;
   const text = await file.text();
   try {
-    const parsed = JSON.parse(text);
-    await importBackupData(parsed);
+    await importBackupData(parseImportText(text));
   } catch (error) {
     console.error("导入文件失败", error);
     toast("导入文件校验失败");

@@ -908,6 +908,34 @@ select:focus-visible {
   gap: 8px;
 }
 
+.file-import-label {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-pick-btn {
+  width: fit-content;
+  min-height: 40px;
+  border-radius: 22px;
+  padding: 0 16px;
+  background: #fff;
+  color: var(--pink-strong);
+  border: 1px solid var(--pink);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .import-hint {
   color: #888;
   font-size: 13px;
