@@ -294,7 +294,6 @@ function render() {
   if (app.tab === "kitchen") renderKitchen();
   if (app.tab === "order") renderOrder();
   if (app.tab === "plan") renderPlan();
-  if (app.tab === "backup") renderBackup();
 }
 
 function renderKitchen() {
@@ -303,7 +302,7 @@ function renderKitchen() {
   view.innerHTML = `
     <section class="page kitchen-page">
       <header class="top-header">
-        ${settings.avatar ? `<img class="logo-avatar" src="${settings.avatar}" alt="头像" data-action="edit-shop">` : `<button class="logo-avatar" data-action="edit-shop">👧</button>`}
+        ${settings.avatar ? `<img class="logo-avatar" src="${settings.avatar}" alt="头像" data-action="open-backup">` : `<button class="logo-avatar" data-action="open-backup">👧</button>`}
         <h1 class="title">${esc(settings.shopName)}</h1>
         <div class="search-box">
           <input class="search-input" data-field="kitchen-search" placeholder="搜索菜品" value="${esc(app.search)}">
@@ -495,29 +494,24 @@ function planCard(plan) {
   `;
 }
 
-function renderBackup() {
+function backupPanelHtml() {
   const backupData = createBackupPayload();
   const size = new Blob([JSON.stringify(backupData)]).size;
-  view.innerHTML = `
-    <section class="page page-wrap">
-      <header class="page-head">
-        <h1 class="page-title">本地备份</h1>
-      </header>
+  return `
+    <div class="backup-panel">
       <div class="backup-box">
         <div class="summary-line"><span>菜品</span><strong>${app.state.foods.length}</strong></div>
-        <div class="summary-line"><span>菜单项</span><strong>${app.state.cart.length}</strong></div>
         <div class="summary-line"><span>想吃计划</span><strong>${app.state.plans.length}</strong></div>
         <div class="summary-line"><span>本地数据大小</span><strong>${Math.ceil(size / 1024)} KB</strong></div>
       </div>
-      <div class="backup-box">
-        <button class="primary-btn" data-action="export-data">导出全部菜品和计划</button>
-        <label class="file-import-label">
-          <span class="label">一键导入备份文件</span>
-          <span class="import-hint">备份包含菜品、计划和图片；导入前会校验内容，已存在的菜品和计划不会重复导入。</span>
-          <span class="file-pick-btn">选择备份文件</span>
+      <div class="backup-actions">
+        <button class="primary-btn backup-action-btn" data-action="export-data">导出全部</button>
+        <label class="secondary-btn backup-action-btn file-import-label">
+          导入备份
           <input class="file-input" type="file" accept="application/json,.json,.txt,text/plain" data-field="import-data">
         </label>
       </div>
+      <div class="import-hint">导出会保存当前厨房菜品和计划页计划；导入会校验并合并，已存在的菜品和计划不会重复导入。</div>
       <div class="backup-box import-box">
         <label class="import-label">
           <span class="label">粘贴导入内容</span>
@@ -526,8 +520,12 @@ function renderBackup() {
         </label>
         <button class="secondary-btn" data-action="import-text">从粘贴内容导入</button>
       </div>
-    </section>
+    </div>
   `;
+}
+
+function openBackupPanel() {
+  openModal(sheet("备份与导入", backupPanelHtml()));
 }
 
 function priorityTone(priority) {
@@ -962,6 +960,7 @@ async function handleClick(event) {
   }
   if (action === "export-data") exportData();
   if (action === "import-text") importBackupText();
+  if (action === "open-backup") openBackupPanel();
   if (action === "edit-shop") openShopForm();
 }
 

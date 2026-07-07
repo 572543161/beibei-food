@@ -1,4 +1,4 @@
-const CACHE_NAME = "beibei-food-pwa-v12";
+const CACHE_NAME = "beibei-food-pwa-v13";
 const ASSETS = [
   "./",
   "./index.html",

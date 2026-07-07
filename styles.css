@@ -170,7 +170,7 @@ select:focus-visible {
 .container {
   display: flex;
   gap: 12px;
-  padding: 14px 12px 96px;
+  padding: 14px 12px 0;
   height: calc(100vh - 144px);
   min-height: 420px;
 }
@@ -237,7 +237,7 @@ select:focus-visible {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding-bottom: 96px;
+  padding-bottom: 136px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -380,10 +380,7 @@ select:focus-visible {
 .mid-add-btn,
 .plan-add-btn {
   position: fixed;
-  left: auto;
-  right: max(18px, calc((100vw - 480px) / 2 + 18px));
   bottom: calc(78px + env(safe-area-inset-bottom));
-  transform: none;
   width: 58px;
   height: 58px;
   border-radius: 50%;
@@ -396,7 +393,15 @@ select:focus-visible {
   z-index: 25;
 }
 
+.mid-add-btn {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .plan-add-btn {
+  left: auto;
+  right: max(18px, calc((100vw - 480px) / 2 + 18px));
+  transform: none;
   font-size: 32px;
   line-height: 1;
 }
@@ -417,7 +422,7 @@ select:focus-visible {
   width: min(100%, 480px);
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--line);
@@ -1033,6 +1038,21 @@ select:focus-visible {
   gap: 14px;
 }
 
+.backup-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.backup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.backup-action-btn {
+  width: 100%;
+}
+
 .import-box {
   border: 1px solid rgba(255, 107, 139, 0.18);
 }
@@ -1044,8 +1064,9 @@ select:focus-visible {
 
 .file-import-label {
   position: relative;
-  display: grid;
-  gap: 8px;
+  display: inline-flex;
+  margin: 0;
+  cursor: pointer;
 }
 
 .file-input {
