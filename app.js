@@ -1031,12 +1031,14 @@ async function handleClick(event) {
     const remark = REMARKS.find(item => item.text === target.dataset.remark);
     app.state.foods = app.state.foods.map(food => food.id === foodId ? { ...food, remark } : food);
     await saveState();
+    render();
     openFoodDetail(foodId);
     toast("评价已保存");
   }
   if (action === "clear-remark") {
     app.state.foods = app.state.foods.map(food => food.id === foodId ? { ...food, remark: null } : food);
     await saveState();
+    render();
     openFoodDetail(foodId);
   }
   if (action === "filter-plan") {
