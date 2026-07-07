@@ -340,11 +340,10 @@ function refreshKitchenFoodList() {
 }
 
 function foodCard(food) {
-  const remark = food.remark ? `<div class="food-remark-tag">${esc(food.remark.text)}</div>` : "";
+  const remark = food.remark ? foodRemarkTagHtml(food.remark) : "";
   return `
     <article class="card food-card" data-action="food-detail" data-id="${food.id}">
       ${remark}
-      <button class="del-food-btn" data-action="delete-food" data-id="${food.id}" aria-label="删除菜品">删除</button>
       ${imageHtml(food.image, "菜品图")}
       <div class="food-info">
         <div class="food-name">${esc(food.name)}</div>
@@ -678,6 +677,36 @@ function openFoodDetail(foodId) {
 }
 
 function remarkOptionsHtml(food) {
+  if (food.remark) {
+    return remarkCardHtml(food.id, food.remark, true);
+  }
+  return REMARKS.map(remark => remarkCardHtml(food.id, remark, false)).join("");
+}
+
+function remarkCardHtml(foodId, remark, active = false) {
+  const config = getRemarkConfig(remark);
+  return `
+    <button class="remark-card ${config.tone} ${active ? "active" : ""}" data-action="set-remark" data-id="${foodId}" data-remark="${esc(config.text)}">
+      <span class="remark-orb">${esc(config.icon)}</span>
+      <span class="remark-text">${esc(config.text)}</span>
+      ${active ? `<span class="remark-current">已选</span>` : ""}
+    </button>
+  `;
+}
+
+function foodRemarkTagHtml(remark) {
+  const config = getRemarkConfig(remark);
+  return `
+    <div class="food-remark-tag ${config.tone}">
+      <span class="remark-orb">${esc(config.icon)}</span>
+      <span class="remark-text">${esc(config.text)}</span>
+    </div>
+  `;
+}
+
+function getRemarkConfig(remark) {
+  const text = String(remark?.text || remark || "").trim();
+  const matched = REMARKS.find(item => item.text === text);
   const icons = {
     "爆好吃": "好",
     "人上人": "赞",
@@ -685,16 +714,11 @@ function remarkOptionsHtml(food) {
     "再接再厉": "试",
     "不合口味": "退"
   };
-  return REMARKS.map(remark => {
-    const active = food.remark && food.remark.text === remark.text;
-    return `
-      <button class="remark-card ${remark.tone} ${active ? "active" : ""}" data-action="set-remark" data-id="${food.id}" data-remark="${esc(remark.text)}">
-        <span class="remark-orb">${esc(icons[remark.text] || remark.text.slice(0, 1))}</span>
-        <span class="remark-text">${esc(remark.text)}</span>
-        ${active ? `<span class="remark-current">已选</span>` : ""}
-      </button>
-    `;
-  }).join("");
+  return {
+    text,
+    tone: matched?.tone || remark?.tone || "pink",
+    icon: icons[text] || text.slice(0, 1) || "评"
+  };
 }
 
 function openDeleteFoodConfirm(foodId) {

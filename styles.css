@@ -333,30 +333,48 @@ select:focus-visible {
   top: 10px;
   right: 12px;
   z-index: 1;
-  max-width: 118px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: var(--pink-strong);
-  color: #fff;
+  max-width: 132px;
+  min-height: 30px;
+  padding: 4px 9px 4px 5px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #fff, var(--page-bg));
+  color: var(--text);
+  border: 1px solid var(--pink);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 6px 14px rgba(255, 107, 139, 0.15);
+  overflow: hidden;
+}
+
+.food-remark-tag .remark-orb {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+.food-remark-tag .remark-text {
+  max-width: 82px;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.del-food-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 3;
-  min-height: 26px;
-  padding: 0 10px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--danger);
-  border: 1px solid #ffccc7;
-  font-size: 12px;
-  box-shadow: 0 2px 8px rgba(45, 42, 43, 0.08);
+.food-remark-tag.amber .remark-orb {
+  background: #ff9f43;
+}
+
+.food-remark-tag.blue .remark-orb {
+  background: #6c8ea4;
+}
+
+.food-remark-tag.mint .remark-orb {
+  background: #42b883;
+}
+
+.food-remark-tag.danger .remark-orb {
+  background: var(--danger);
 }
 
 .mid-add-btn,
