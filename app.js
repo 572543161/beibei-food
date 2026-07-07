@@ -46,6 +46,12 @@ const app = {
 const view = document.querySelector("#view");
 const modal = document.querySelector("#modal");
 const toastEl = document.querySelector("#toast");
+const scrollHint = document.createElement("div");
+const scrollHintBound = new WeakSet();
+let scrollHintTimer = 0;
+
+scrollHint.className = "scroll-follow-thumb";
+document.body.appendChild(scrollHint);
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -277,6 +283,34 @@ function toast(message) {
   toast.timer = window.setTimeout(() => toastEl.classList.add("hidden"), 1900);
 }
 
+function bindScrollHints(root = document) {
+  const nodes = new Set([view]);
+  if (root.querySelectorAll) {
+    root.querySelectorAll(".right-food-list, .left-category, .sheet-body").forEach(node => nodes.add(node));
+  }
+  nodes.forEach(node => {
+    if (!node || scrollHintBound.has(node)) return;
+    scrollHintBound.add(node);
+    node.addEventListener("scroll", () => showScrollHint(node), { passive: true });
+  });
+}
+
+function showScrollHint(node) {
+  if (!node || node.scrollHeight <= node.clientHeight + 4) return;
+  const rect = node.getBoundingClientRect();
+  const maxScroll = node.scrollHeight - node.clientHeight;
+  const thumbHeight = Math.max(24, Math.min(42, rect.height * 0.18));
+  const progress = maxScroll > 0 ? node.scrollTop / maxScroll : 0;
+  const top = rect.top + (rect.height - thumbHeight) * progress;
+  const left = rect.right - 7;
+
+  scrollHint.style.height = `${thumbHeight}px`;
+  scrollHint.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+  scrollHint.classList.add("active");
+  window.clearTimeout(scrollHintTimer);
+  scrollHintTimer = window.setTimeout(() => scrollHint.classList.remove("active"), 520);
+}
+
 function imageHtml(src, label = "无图片") {
   return src
     ? `<img class="thumb" src="${src}" alt="${esc(label)}">`
@@ -294,6 +328,7 @@ function render() {
   if (app.tab === "kitchen") renderKitchen();
   if (app.tab === "order") renderOrder();
   if (app.tab === "plan") renderPlan();
+  bindScrollHints(view);
 }
 
 function renderKitchen() {
@@ -564,11 +599,13 @@ function comparePlan(a, b) {
 function openModal(html) {
   modal.innerHTML = html;
   modal.classList.remove("hidden");
+  bindScrollHints(modal);
 }
 
 function closeModal() {
   modal.classList.add("hidden");
   modal.innerHTML = "";
+  scrollHint.classList.remove("active");
 }
 
 function sheet(title, body) {

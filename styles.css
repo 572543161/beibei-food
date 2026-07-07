@@ -71,6 +71,38 @@ select:focus-visible {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.view::-webkit-scrollbar,
+.left-category::-webkit-scrollbar,
+.right-food-list::-webkit-scrollbar,
+.chip-row::-webkit-scrollbar,
+.sheet-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.scroll-follow-thumb {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 90;
+  width: 4px;
+  min-height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 107, 139, 0.62);
+  box-shadow: 0 0 8px rgba(255, 107, 139, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  will-change: transform, height, opacity;
+}
+
+.scroll-follow-thumb.active {
+  opacity: 1;
 }
 
 .page {
@@ -209,12 +241,7 @@ select:focus-visible {
   overflow-y: auto;
   flex: 0 0 auto;
   scrollbar-width: none;
-}
-
-.left-category::-webkit-scrollbar,
-.right-food-list::-webkit-scrollbar,
-.chip-row::-webkit-scrollbar {
-  display: none;
+  -ms-overflow-style: none;
 }
 
 .category-item {
@@ -268,6 +295,7 @@ select:focus-visible {
   padding-bottom: 136px;
   overflow-y: auto;
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .card {
@@ -609,6 +637,7 @@ select:focus-visible {
   overflow-x: auto;
   padding: 2px 0 14px;
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .chip {
@@ -838,6 +867,8 @@ select:focus-visible {
   padding: 12px 18px 18px;
   overflow-y: auto;
   max-height: calc(82vh - 64px);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .form-grid {
