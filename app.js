@@ -40,17 +40,12 @@ const app = {
   search: "",
   planSearch: "",
   planStatus: "全部",
-  importText: "",
-  manageMode: false
+  importText: ""
 };
 
 const view = document.querySelector("#view");
 const modal = document.querySelector("#modal");
 const toastEl = document.querySelector("#toast");
-const LONG_PRESS_MS = 800;
-let categoryPressTimer = 0;
-let categoryPressStart = null;
-let ignoreNextCategoryClick = false;
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -313,7 +308,6 @@ function renderKitchen() {
         <div class="search-box">
           <input class="search-input" data-field="kitchen-search" placeholder="搜索菜品" value="${esc(app.search)}">
         </div>
-        ${app.manageMode ? `<button class="manage-tip" data-action="exit-manage">退出</button>` : ""}
       </header>
       <div class="container">
         <aside class="left-category">
@@ -350,14 +344,14 @@ function foodCard(food) {
   return `
     <article class="card food-card" data-action="food-detail" data-id="${food.id}">
       ${remark}
-      ${app.manageMode ? `<button class="del-food-btn" data-action="delete-food" data-id="${food.id}">删除</button>` : ""}
+      <button class="del-food-btn" data-action="delete-food" data-id="${food.id}" aria-label="删除菜品">删除</button>
       ${imageHtml(food.image, "菜品图")}
       <div class="food-info">
         <div class="food-name">${esc(food.name)}</div>
         <div class="food-alias">${esc(food.desc || getCategoryName(food.category))}</div>
         <div class="food-price">¥${money(food.price)}</div>
       </div>
-      ${app.manageMode ? "" : `<button class="add-circle" data-action="add-cart" data-id="${food.id}" aria-label="加入菜单">+</button>`}
+      <button class="add-circle" data-action="add-cart" data-id="${food.id}" aria-label="加入菜单">+</button>
     </article>
   `;
 }
@@ -671,17 +665,36 @@ function openFoodDetail(foodId) {
         </div>
       </div>
       <div class="detail-section">${nl(food.recipe || food.desc || "暂无更多记录")}</div>
-      <div class="chip-row">
-        ${REMARKS.map(remark => `<button class="chip" data-action="set-remark" data-id="${food.id}" data-remark="${esc(remark.text)}">${remark.text}</button>`).join("")}
-      </div>
+      <div class="remark-picker">${remarkOptionsHtml(food)}</div>
       <div class="actions">
         <button class="primary-btn" data-action="add-cart" data-id="${food.id}">加入菜单</button>
         <button class="secondary-btn" data-action="open-food-form" data-id="${food.id}">编辑</button>
+        <button class="danger-btn" data-action="delete-food" data-id="${food.id}">删除</button>
         ${food.remark ? `<button class="secondary-btn" data-action="clear-remark" data-id="${food.id}">取消评价</button>` : ""}
       </div>
     </div>
   `;
   openModal(sheet("菜品详情", body));
+}
+
+function remarkOptionsHtml(food) {
+  const icons = {
+    "爆好吃": "好",
+    "人上人": "赞",
+    "一般般": "中",
+    "再接再厉": "试",
+    "不合口味": "退"
+  };
+  return REMARKS.map(remark => {
+    const active = food.remark && food.remark.text === remark.text;
+    return `
+      <button class="remark-card ${remark.tone} ${active ? "active" : ""}" data-action="set-remark" data-id="${food.id}" data-remark="${esc(remark.text)}">
+        <span class="remark-orb">${esc(icons[remark.text] || remark.text.slice(0, 1))}</span>
+        <span class="remark-text">${esc(remark.text)}</span>
+        ${active ? `<span class="remark-current">已选</span>` : ""}
+      </button>
+    `;
+  }).join("");
 }
 
 function openDeleteFoodConfirm(foodId) {
@@ -862,25 +875,14 @@ async function handleClick(event) {
   const foodId = target.dataset.id;
 
   if (action === "close-modal") closeModal();
-  if (action === "exit-manage") {
-    app.manageMode = false;
-    render();
-    return;
-  }
   if (action === "switch-category") {
-    if (ignoreNextCategoryClick) {
-      ignoreNextCategoryClick = false;
-      return;
-    }
-    if (app.manageMode) return;
     app.category = target.dataset.category;
     app.search = "";
     render();
   }
   if (action === "open-food-form") openFoodForm(foodId);
-  if (action === "food-detail" && !app.manageMode) openFoodDetail(foodId);
+  if (action === "food-detail") openFoodDetail(foodId);
   if (action === "add-cart") {
-    if (app.manageMode) return;
     addCart(foodId);
     await saveState();
     render();
@@ -937,39 +939,6 @@ async function handleClick(event) {
   if (action === "export-data") exportData();
   if (action === "import-text") importBackupText();
   if (action === "edit-shop") openShopForm();
-}
-
-function handlePointerDown(event) {
-  const target = event.target.closest("[data-action='switch-category']");
-  if (!target || app.tab !== "kitchen") return;
-  if (event.pointerType === "mouse" && event.button !== 0) return;
-  window.clearTimeout(categoryPressTimer);
-  categoryPressStart = {
-    x: event.clientX,
-    y: event.clientY,
-    category: target.dataset.category
-  };
-  categoryPressTimer = window.setTimeout(() => {
-    app.category = categoryPressStart.category;
-    app.search = "";
-    app.manageMode = !app.manageMode;
-    ignoreNextCategoryClick = true;
-    render();
-    toast(app.manageMode ? "已进入管理模式" : "已退出管理模式");
-  }, LONG_PRESS_MS);
-}
-
-function handlePointerMove(event) {
-  if (!categoryPressStart) return;
-  const moveX = Math.abs(event.clientX - categoryPressStart.x);
-  const moveY = Math.abs(event.clientY - categoryPressStart.y);
-  if (moveX > 10 || moveY > 10) clearCategoryPress();
-}
-
-function clearCategoryPress() {
-  window.clearTimeout(categoryPressTimer);
-  categoryPressTimer = 0;
-  categoryPressStart = null;
 }
 
 function handleContextMenu(event) {
@@ -1114,17 +1083,12 @@ function openShopForm() {
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     app.tab = btn.dataset.tab;
-    app.manageMode = false;
     closeModal();
     render();
   });
 });
 
 document.addEventListener("click", handleClick);
-document.addEventListener("pointerdown", handlePointerDown);
-document.addEventListener("pointermove", handlePointerMove);
-document.addEventListener("pointerup", clearCategoryPress);
-document.addEventListener("pointercancel", clearCategoryPress);
 document.addEventListener("contextmenu", handleContextMenu);
 document.addEventListener("input", handleInput);
 document.addEventListener("change", handleChange);

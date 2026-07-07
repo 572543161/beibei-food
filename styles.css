@@ -135,12 +135,20 @@ select:focus-visible {
 .search-box {
   flex: 1;
   min-width: 108px;
-  height: 38px;
+  height: 42px;
   background: #fff;
-  border-radius: 19px;
-  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 21px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.search-box:focus-within,
+.plan-toolbar .search:focus {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 107, 139, 0.12);
 }
 
 .search-input,
@@ -154,10 +162,15 @@ select:focus-visible {
   font-size: 14px;
 }
 
+.search-input:focus-visible,
+.search:focus-visible {
+  outline: 0;
+}
+
 .container {
   display: flex;
   gap: 12px;
-  padding: 14px 12px 106px;
+  padding: 14px 12px 96px;
   height: calc(100vh - 144px);
   min-height: 420px;
 }
@@ -224,6 +237,7 @@ select:focus-visible {
   flex: 1;
   min-width: 0;
   height: 100%;
+  padding-bottom: 96px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -333,36 +347,27 @@ select:focus-visible {
 .del-food-btn {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   z-index: 3;
-  min-height: 28px;
-  padding: 0 12px;
-  border-radius: 16px;
-  background: var(--danger);
-  color: #fff;
-  font-size: 12px;
-}
-
-.manage-tip {
-  min-width: 42px;
-  height: 32px;
+  min-height: 26px;
   padding: 0 10px;
-  border-radius: 16px;
-  background: #fff;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.92);
   color: var(--danger);
-  font-size: 13px;
-  font-weight: 700;
-  flex: 0 0 auto;
+  border: 1px solid #ffccc7;
+  font-size: 12px;
+  box-shadow: 0 2px 8px rgba(45, 42, 43, 0.08);
 }
 
 .mid-add-btn,
 .plan-add-btn {
   position: fixed;
-  left: 50%;
+  left: auto;
+  right: max(18px, calc((100vw - 480px) / 2 + 18px));
   bottom: calc(78px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: 72px;
-  height: 72px;
+  transform: none;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: var(--pink-strong);
   color: #fff;
@@ -374,11 +379,6 @@ select:focus-visible {
 }
 
 .plan-add-btn {
-  left: auto;
-  right: max(18px, calc((100vw - 480px) / 2 + 18px));
-  transform: none;
-  width: 58px;
-  height: 58px;
   font-size: 32px;
   line-height: 1;
 }
@@ -542,8 +542,10 @@ select:focus-visible {
 .plan-toolbar .search {
   height: 42px;
   padding: 0 16px;
+  border: 1px solid transparent;
   border-radius: 21px;
   background: #fff;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .chip-row {
@@ -859,6 +861,120 @@ select:focus-visible {
 .detail-stack {
   display: grid;
   gap: 12px;
+}
+
+.remark-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.remark-card {
+  position: relative;
+  min-height: 58px;
+  padding: 9px 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff, var(--page-bg));
+  color: var(--text);
+  border: 1px solid rgba(255, 182, 193, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.remark-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -18px -22px auto;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 107, 139, 0.12);
+}
+
+.remark-card:active {
+  transform: scale(0.98);
+}
+
+.remark-card.active {
+  border-color: var(--pink-strong);
+  box-shadow: 0 8px 20px rgba(255, 107, 139, 0.18);
+  transform: translateY(-2px);
+}
+
+.remark-card.active .remark-orb {
+  animation: remark-float 1.6s ease-in-out infinite;
+}
+
+.remark-orb {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: var(--pink-strong);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.remark-text {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.remark-current {
+  position: relative;
+  z-index: 1;
+  height: 22px;
+  line-height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--pink-strong);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.remark-card.amber .remark-orb,
+.remark-card.amber .remark-current {
+  background: #ff9f43;
+}
+
+.remark-card.blue .remark-orb,
+.remark-card.blue .remark-current {
+  background: #6c8ea4;
+}
+
+.remark-card.mint .remark-orb,
+.remark-card.mint .remark-current {
+  background: #42b883;
+}
+
+.remark-card.danger .remark-orb,
+.remark-card.danger .remark-current {
+  background: var(--danger);
+}
+
+@keyframes remark-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-4deg);
+  }
 }
 
 .delete-confirm {
